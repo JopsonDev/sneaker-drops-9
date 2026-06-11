@@ -1,11 +1,9 @@
 package com.pluralsight.sneakerdrop.sneakerdrops;
 
 import com.pluralsight.sneakerdrop.sneakerdrops.data.BrandRepository;
-import com.pluralsight.sneakerdrop.sneakerdrops.data.SneakerRepository;
 import com.pluralsight.sneakerdrop.sneakerdrops.models.Brand;
 import com.pluralsight.sneakerdrop.sneakerdrops.models.Sneaker;
-import com.pluralsight.sneakerdrop.sneakerdrops.service.DropService;
-import com.pluralsight.sneakerdrop.sneakerdrops.service.InventoryService;
+import com.pluralsight.sneakerdrop.sneakerdrops.service.SneakerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -15,24 +13,16 @@ import java.util.Scanner;
 @Component
 public class StartupRunner implements CommandLineRunner {
 
-    private final DropService dropService;
-    private final InventoryService inventoryService;
-    private final BrandRepository brandRepository;
-    private final SneakerRepository sneakerRepository;
+    private final SneakerService sneakerService;
 
     @Autowired
-    public StartupRunner(DropService dropService, InventoryService inventoryService, BrandRepository brandRepository, SneakerRepository sneakerRepository) {
-        this.dropService = dropService;
-        this.inventoryService = inventoryService;
-        this.brandRepository = brandRepository;
-        this.sneakerRepository = sneakerRepository;
+    public StartupRunner(SneakerService sneakerService) {
+        this.sneakerService = sneakerService;
     }
 
     @Override
     public void run(String... args) throws Exception {
         Scanner scanner = new Scanner(System.in);
-        System.out.println(dropService.getStatus());
-        System.out.println(inventoryService.getInventory());
         seedData();
         while(true) {
             System.out.println("1). List all shoes");
@@ -72,8 +62,8 @@ public class StartupRunner implements CommandLineRunner {
     }
 
     private void listSneakers(){
-        System.out.println("Total = " + sneakerRepository.count());
-        for (Sneaker s : sneakerRepository.findAll()) {
+        System.out.println("Total = " + sneakerService.countSneakers());
+        for (Sneaker s : sneakerService.allSneakers()) {
             System.out.println(s.getId() + " - " + s.getModel());
         }
     }
@@ -81,7 +71,7 @@ public class StartupRunner implements CommandLineRunner {
         System.out.print("Please enter model: ");
         String input = scanner.nextLine();
 
-        for(Sneaker s : sneakerRepository.findSneakerByModelContaining(input)){
+        for(Sneaker s : sneakerService.findByContains(input)){
             System.out.println(s);
         }
     }
@@ -90,7 +80,7 @@ public class StartupRunner implements CommandLineRunner {
         double input = scanner.nextDouble();
         scanner.nextLine();
 
-        for(Sneaker s : sneakerRepository.findSneakerByPriceGreaterThan(input)){
+        for(Sneaker s : sneakerService.findPriceGreaterThan(input)){
             System.out.println(s);
         }
     }
@@ -100,7 +90,7 @@ public class StartupRunner implements CommandLineRunner {
         int input = scanner.nextInt();
         scanner.nextLine();
 
-        for(Sneaker s : sneakerRepository.findSneakerByReleaseYear(input)){
+        for(Sneaker s : sneakerService.findByYear(input)){
             System.out.println(s);
         }
     }
@@ -109,7 +99,7 @@ public class StartupRunner implements CommandLineRunner {
         System.out.println("Sneaker ID: ");
         long input = scanner.nextInt();
         scanner.nextLine();
-        Sneaker sneaker = sneakerRepository.findById(input).orElse(null);
+        Sneaker sneaker = sneakerService.findById(input);
         if(sneaker == null){
             System.out.println("No sneakers with that ID");
         } else {
@@ -117,8 +107,8 @@ public class StartupRunner implements CommandLineRunner {
         }
     }
     private void listBrand(Scanner scanner){
-        System.out.println("Total = " + brandRepository.count());
-        for (Brand b : brandRepository.findAll()) {
+        System.out.println("Total = " + sneakerService.countBrands());
+        for (Brand b : sneakerService.findAllBrands()) {
             System.out.println(b.getId() + " - " + b.getName());
         }
     }
@@ -127,7 +117,7 @@ public class StartupRunner implements CommandLineRunner {
             System.out.println("Brand: ");
             long input = scanner.nextInt();
             scanner.nextLine();
-            Brand brand = brandRepository.findById(input).orElse(null);
+            Brand brand = sneakerService.findBrandById(input);
             if (brand == null) {
                 System.out.println("No brand with that ID");
             } else {
@@ -143,7 +133,7 @@ public class StartupRunner implements CommandLineRunner {
         int year = scanner.nextInt();
         scanner.nextLine();
 
-        for(Sneaker s : sneakerRepository.search(price, year)){
+        for(Sneaker s : sneakerService.search(price, year)){
             System.out.println(s.getId() + " - " + s.getModel());
         }
     }
@@ -158,34 +148,44 @@ public class StartupRunner implements CommandLineRunner {
         System.out.print("Release year: ");
         int year = scanner.nextInt();
         scanner.nextLine();
-        sneakerRepository.save(new Sneaker(model, price, year, brand));
+        sneakerService.save(model,price,year,brand);
         System.out.println("Updated!");
     }
 
+    private Sneaker checkId(Scanner scanner){
+        Sneaker sneaker;
+        while (true) {
+            System.out.print("Snaker ID: ");
+            long id = scanner.nextLong();
+            sneaker = sneakerService.findById(id);
+            if (sneaker == null){
+                System.out.println("Invalid input");
+            } else {
+                break;
+            }
+        }
+        return sneaker;
+    }
+
     private void updatePrice(Scanner scanner){
-        System.out.print("Snaker ID: ");
-        long id = scanner.nextLong();
-        Sneaker sneaker = sneakerRepository.findById(id).orElseThrow(() -> new RuntimeException("No Sneakers with id" + id));
+        Sneaker sneaker = checkId(scanner);
         System.out.print("New Price: ");
         sneaker.setPrice(scanner.nextDouble());
         scanner.nextLine();
-        sneakerRepository.save(sneaker);
+        sneakerService.save(sneaker);
         System.out.println("Updated!");
     }
 
     private void deleteShoe(Scanner scanner){
-        System.out.print("Snaker ID: ");
-        long id = scanner.nextLong();
-        Sneaker sneaker = sneakerRepository.findById(id).orElseThrow(() -> new RuntimeException("No Sneakers with id" + id));
-        scanner.nextLine();
-        sneakerRepository.delete(sneaker);
+        Sneaker sneaker = checkId(scanner);
+        sneakerService.delete(sneaker);
         System.out.println("Updated!");
     }
     private void listShoesByBrand(Scanner scanner){
         listBrand(scanner);
         System.out.print("Brand: ");
         long id = scanner.nextLong();
-        for (Sneaker s : sneakerRepository.findSneakerByBrand_Id(id)) {
+        for (Sneaker s : sneakerService.searchBrand(id)) {
             System.out.println(s.getId() + " - " + s.getModel());
         }
     }
@@ -193,7 +193,7 @@ public class StartupRunner implements CommandLineRunner {
     private void addBrand(Scanner scanner){
         System.out.print("New Brand: ");
         String brand = scanner.nextLine();
-        brandRepository.save(new Brand(brand));
+        sneakerService.saveBrand(new Brand(brand));
         System.out.println("Updated!");
     }
 
@@ -216,15 +216,15 @@ public class StartupRunner implements CommandLineRunner {
     }
 
     private void seedData() {
-        if(brandRepository.count() > 0){
+        if(sneakerService.countBrands() > 0){
             return;
         }
-        Brand Nike = brandRepository.save(new Brand("Nike"));
-        Brand Apple = brandRepository.save(new Brand("Apple"));
-        Brand Samsung = brandRepository.save(new Brand("Samsung"));
+        Brand Nike = sneakerService.saveBrand(new Brand("Nike"));
+        Brand Apple = sneakerService.saveBrand(new Brand("Apple"));
+        Brand Samsung = sneakerService.saveBrand(new Brand("Samsung"));
 
-        sneakerRepository.save(new Sneaker("T40", 22.50, 2010, Nike));
-        sneakerRepository.save(new Sneaker("Aplle 2.0", 100.99, 2026, Apple));
-        sneakerRepository.save(new Sneaker("1.0 bounce", 55.99, 2015, Samsung));
+        sneakerService.save(new Sneaker("T40", 22.50, 2010, Nike));
+        sneakerService.save(new Sneaker("Aplle 2.0", 100.99, 2026, Apple));
+        sneakerService.save(new Sneaker("1.0 bounce", 55.99, 2015, Samsung));
     }
 }
